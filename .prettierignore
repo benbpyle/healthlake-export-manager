@@ -1,0 +1,5 @@
+.aws-sam
+.cdk.staging
+cdk.*
+
+coverage
