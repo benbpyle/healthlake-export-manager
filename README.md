@@ -4,4 +4,4 @@ Purpose: Working example of using AWS Step Functions, SQS, Lambda, S3 and EventB
 
 ## State Machine
 
-![State Machine](./workflow.png)
+![State Machine](./workflow.svg)
