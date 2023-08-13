@@ -31,6 +31,7 @@ export default class CdcBucket extends Construct {
             intelligentTieringConfigurations: [authArchive],
             blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
             removalPolicy: RemovalPolicy.DESTROY,
+            autoDeleteObjects: true,
         });
     }
 }

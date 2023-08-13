@@ -1,277 +1,277 @@
 {
-  "StartAt": "Find Last Run",
-  "States": {
-    "Find Last Run": {
-      "Next": "Last Run State",
-      "Type": "Task",
-      "ResultPath": "$.context",
-      "ResultSelector": {
-        "runStatus.$": "$.Item.runStatus.S",
-        "lastRunTime.$": "$.Item.lastRunTime.S"
-      },
-      "Resource": "arn:aws:states:::dynamodb:getItem",
-      "Parameters": {
-        "Key": {
-          "id": {
-            "S": "RUN"
-          }
-        },
-        "TableName": "HealthLakeCdcExports",
-        "ConsistentRead": true
-      }
-    },
-    "Last Run State": {
-      "Type": "Choice",
-      "Choices": [
-        {
-          "Variable": "$.context.runStatus",
-          "StringEquals": "RUNNING",
-          "Next": "Job in Progress"
-        }
-      ],
-      "Default": "Set Run Time"
-    },
-    "Set Run Time": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::dynamodb:putItem",
-      "Parameters": {
-        "TableName": "HealthLakeCdcExports",
-        "Item": {
-          "id": {
-            "S": "CURRENT_RUN"
-          },
-          "triggerTime": {
-            "S.$": "$$.Execution.StartTime"
-          }
-        }
-      },
-      "Next": "Update Job to Running",
-      "ResultPath": null
-    },
-    "Update Job to Running": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::dynamodb:updateItem",
-      "Parameters": {
-        "TableName": "HealthLakeCdcExports",
-        "Key": {
-          "id": {
-            "S": "RUN"
-          }
-        },
-        "UpdateExpression": "SET runStatus = :s",
-        "ExpressionAttributeValues": {
-          ":s": {
-            "S": "RUNNING"
-          }
-        }
-      },
-      "Next": "Send SQS Start Export",
-      "ResultPath": null
-    },
-    "Job in Progress": {
-      "Type": "Succeed",
-      "Comment": "Job succeeded because there was nothing to do as there was still a job running"
-    },
-    "Send SQS Start Export": {
-      "Next": "Map",
-      "Type": "Task",
-      "HeartbeatSeconds": 120,
-      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
-      "Parameters": {
-        "QueueUrl": "${StartExportQueueUrl}",
-        "MessageBody": {
-          "taskToken.$": "$$.Task.Token",
-          "lastRunTime.$": "$.context.lastRunTime",
-          "runStatus.$": "$.context.runStatus"
-        }
-      },
-      "Catch": [
-        {
-          "ErrorEquals": ["States.ALL"],
-          "Next": "Set Failed"
-        }
-      ]
-    },
-    "Set Failed": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::dynamodb:updateItem",
-      "Parameters": {
-        "TableName": "HealthLakeCdcExports",
-        "Key": {
-          "id": {
-            "S": "RUN"
-          }
-        },
-        "UpdateExpression": "SET runStatus = :s",
-        "ExpressionAttributeValues": {
-          ":s": {
-            "S": "FAILED"
-          }
-        }
-      },
-      "Next": "Fail"
-    },
-    "Fail": {
-      "Type": "Fail"
-    },
-    "Map": {
-      "Type": "Map",
-      "ItemProcessor": {
-        "ProcessorConfig": {
-          "Mode": "DISTRIBUTED",
-          "ExecutionType": "STANDARD"
-        },
-        "StartAt": "Lambda Invoke",
-        "States": {
-          "Lambda Invoke": {
+    "StartAt": "Find Last Run",
+    "States": {
+        "Find Last Run": {
+            "Next": "Last Run State",
             "Type": "Task",
-            "Resource": "arn:aws:states:::lambda:invoke",
-            "OutputPath": "$.Payload",
-            "Parameters": {
-              "Payload.$": "$",
-              "FunctionName": "${PrepareChangeFunction}"
+            "ResultPath": "$.context",
+            "ResultSelector": {
+                "runStatus.$": "$.Item.runStatus.S",
+                "lastRunTime.$": "$.Item.lastRunTime.S"
             },
-            "Retry": [
-              {
-                "ErrorEquals": [
-                  "Lambda.ServiceException",
-                  "Lambda.AWSLambdaException",
-                  "Lambda.SdkClientException",
-                  "Lambda.TooManyRequestsException"
-                ],
-                "IntervalSeconds": 2,
-                "MaxAttempts": 6,
-                "BackoffRate": 2
-              }
+            "Resource": "arn:aws:states:::dynamodb:getItem",
+            "Parameters": {
+                "Key": {
+                    "id": {
+                        "S": "RUN"
+                    }
+                },
+                "TableName": "HealthLakeCdcExports",
+                "ConsistentRead": true
+            }
+        },
+        "Last Run State": {
+            "Type": "Choice",
+            "Choices": [
+                {
+                    "Variable": "$.context.runStatus",
+                    "StringEquals": "RUNNING",
+                    "Next": "Job in Progress"
+                }
             ],
-            "Next": "Internal Map",
-            "Catch": [
-              {
-                "ErrorEquals": ["States.ALL"],
-                "Next": "Set Failed Internal Map"
-              }
-            ]
-          },
-          "Set Failed Internal Map": {
+            "Default": "Set Run Time"
+        },
+        "Set Run Time": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::dynamodb:putItem",
+            "Parameters": {
+                "TableName": "HealthLakeCdcExports",
+                "Item": {
+                    "id": {
+                        "S": "CURRENT_RUN"
+                    },
+                    "triggerTime": {
+                        "S.$": "$$.Execution.StartTime"
+                    }
+                }
+            },
+            "Next": "Update Job to Running",
+            "ResultPath": null
+        },
+        "Update Job to Running": {
             "Type": "Task",
             "Resource": "arn:aws:states:::dynamodb:updateItem",
             "Parameters": {
-              "TableName": "HealthLakeCdcExports",
-              "Key": {
-                "id": {
-                  "S": "RUN"
+                "TableName": "HealthLakeCdcExports",
+                "Key": {
+                    "id": {
+                        "S": "RUN"
+                    }
+                },
+                "UpdateExpression": "SET runStatus = :s",
+                "ExpressionAttributeValues": {
+                    ":s": {
+                        "S": "RUNNING"
+                    }
                 }
-              },
-              "UpdateExpression": "SET runStatus = :s",
-              "ExpressionAttributeValues": {
-                ":s": {
-                  "S": "FAILED"
-                }
-              }
             },
-            "Next": "Fail in Map"
-          },
-          "Fail in Map": {
+            "Next": "Send SQS Start Export",
+            "ResultPath": null
+        },
+        "Job in Progress": {
+            "Type": "Succeed",
+            "Comment": "Job succeeded because there was nothing to do as there was still a job running"
+        },
+        "Send SQS Start Export": {
+            "Next": "Map",
+            "Type": "Task",
+            "HeartbeatSeconds": 120,
+            "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
+            "Parameters": {
+                "QueueUrl": "${StartExportQueueUrl}",
+                "MessageBody": {
+                    "taskToken.$": "$$.Task.Token",
+                    "lastRunTime.$": "$.context.lastRunTime",
+                    "runStatus.$": "$.context.runStatus"
+                }
+            },
+            "Catch": [
+                {
+                    "ErrorEquals": ["States.ALL"],
+                    "Next": "Set Failed"
+                }
+            ]
+        },
+        "Set Failed": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::dynamodb:updateItem",
+            "Parameters": {
+                "TableName": "HealthLakeCdcExports",
+                "Key": {
+                    "id": {
+                        "S": "RUN"
+                    }
+                },
+                "UpdateExpression": "SET runStatus = :s",
+                "ExpressionAttributeValues": {
+                    ":s": {
+                        "S": "FAILED"
+                    }
+                }
+            },
+            "Next": "Fail"
+        },
+        "Fail": {
             "Type": "Fail"
-          },
-          "Internal Map": {
+        },
+        "Map": {
             "Type": "Map",
             "ItemProcessor": {
-              "ProcessorConfig": {
-                "Mode": "INLINE"
-              },
-              "StartAt": "EventBridge PutEvents",
-              "States": {
-                "EventBridge PutEvents": {
-                  "Type": "Task",
-                  "Resource": "arn:aws:states:::events:putEvents",
-                  "Parameters": {
-                    "Entries": [
-                      {
-                        "Detail.$": "$",
-                        "DetailType": "FhirResourceChanged",
-                        "EventBusName": "main-mda-bus",
-                        "Source.$": "$.meta.source"
-                      }
-                    ]
-                  },
-                  "End": true
+                "ProcessorConfig": {
+                    "Mode": "DISTRIBUTED",
+                    "ExecutionType": "STANDARD"
+                },
+                "StartAt": "Lambda Invoke",
+                "States": {
+                    "Lambda Invoke": {
+                        "Type": "Task",
+                        "Resource": "arn:aws:states:::lambda:invoke",
+                        "OutputPath": "$.Payload",
+                        "Parameters": {
+                            "Payload.$": "$",
+                            "FunctionName": "${PrepareChangeFunction}"
+                        },
+                        "Retry": [
+                            {
+                                "ErrorEquals": [
+                                    "Lambda.ServiceException",
+                                    "Lambda.AWSLambdaException",
+                                    "Lambda.SdkClientException",
+                                    "Lambda.TooManyRequestsException"
+                                ],
+                                "IntervalSeconds": 2,
+                                "MaxAttempts": 6,
+                                "BackoffRate": 2
+                            }
+                        ],
+                        "Next": "Internal Map",
+                        "Catch": [
+                            {
+                                "ErrorEquals": ["States.ALL"],
+                                "Next": "Set Failed Internal Map"
+                            }
+                        ]
+                    },
+                    "Set Failed Internal Map": {
+                        "Type": "Task",
+                        "Resource": "arn:aws:states:::dynamodb:updateItem",
+                        "Parameters": {
+                            "TableName": "HealthLakeCdcExports",
+                            "Key": {
+                                "id": {
+                                    "S": "RUN"
+                                }
+                            },
+                            "UpdateExpression": "SET runStatus = :s",
+                            "ExpressionAttributeValues": {
+                                ":s": {
+                                    "S": "FAILED"
+                                }
+                            }
+                        },
+                        "Next": "Fail in Map"
+                    },
+                    "Fail in Map": {
+                        "Type": "Fail"
+                    },
+                    "Internal Map": {
+                        "Type": "Map",
+                        "ItemProcessor": {
+                            "ProcessorConfig": {
+                                "Mode": "INLINE"
+                            },
+                            "StartAt": "EventBridge PutEvents",
+                            "States": {
+                                "EventBridge PutEvents": {
+                                    "Type": "Task",
+                                    "Resource": "arn:aws:states:::events:putEvents",
+                                    "Parameters": {
+                                        "Entries": [
+                                            {
+                                                "Detail.$": "$",
+                                                "DetailType": "FhirResourceChanged",
+                                                "EventBusName": "${EventBus}",
+                                                "Source.$": "$.meta.source"
+                                            }
+                                        ]
+                                    },
+                                    "End": true
+                                }
+                            }
+                        },
+                        "End": true,
+                        "Catch": [
+                            {
+                                "ErrorEquals": ["States.ALL"],
+                                "Next": "Set Failed Internal Map"
+                            }
+                        ]
+                    }
                 }
-              }
             },
-            "End": true,
+            "Next": "Get Triggered Time",
+            "Label": "Map",
+            "MaxConcurrency": 100,
+            "ItemReader": {
+                "Resource": "arn:aws:states:::s3:getObject",
+                "ReaderConfig": {
+                    "InputType": "JSON"
+                },
+                "Parameters": {
+                    "Bucket.$": "$.bucket",
+                    "Key.$": "$.manifest"
+                }
+            },
             "Catch": [
-              {
-                "ErrorEquals": ["States.ALL"],
-                "Next": "Set Failed Internal Map"
-              }
-            ]
-          }
-        }
-      },
-      "Next": "Get Triggered Time",
-      "Label": "Map",
-      "MaxConcurrency": 100,
-      "ItemReader": {
-        "Resource": "arn:aws:states:::s3:getObject",
-        "ReaderConfig": {
-          "InputType": "JSON"
+                {
+                    "ErrorEquals": ["States.ALL"],
+                    "Next": "Set Failed"
+                }
+            ],
+            "ResultPath": null
         },
-        "Parameters": {
-          "Bucket.$": "$.bucket",
-          "Key.$": "$.manifest"
-        }
-      },
-      "Catch": [
-        {
-          "ErrorEquals": ["States.ALL"],
-          "Next": "Set Failed"
-        }
-      ],
-      "ResultPath": null
-    },
-    "Get Triggered Time": {
-      "Next": "Complete Job",
-      "Type": "Task",
-      "ResultSelector": {
-        "triggerTime.$": "$.Item.triggerTime.S"
-      },
-      "Resource": "arn:aws:states:::dynamodb:getItem",
-      "Parameters": {
-        "Key": {
-          "id": {
-            "S": "CURRENT_RUN"
-          }
+        "Get Triggered Time": {
+            "Next": "Complete Job",
+            "Type": "Task",
+            "ResultSelector": {
+                "triggerTime.$": "$.Item.triggerTime.S"
+            },
+            "Resource": "arn:aws:states:::dynamodb:getItem",
+            "Parameters": {
+                "Key": {
+                    "id": {
+                        "S": "CURRENT_RUN"
+                    }
+                },
+                "TableName": "HealthLakeCdcExports",
+                "ConsistentRead": true
+            }
         },
-        "TableName": "HealthLakeCdcExports",
-        "ConsistentRead": true
-      }
-    },
-    "Complete Job": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::dynamodb:updateItem",
-      "Parameters": {
-        "TableName": "HealthLakeCdcExports",
-        "Key": {
-          "id": {
-            "S": "RUN"
-          }
+        "Complete Job": {
+            "Type": "Task",
+            "Resource": "arn:aws:states:::dynamodb:updateItem",
+            "Parameters": {
+                "TableName": "HealthLakeCdcExports",
+                "Key": {
+                    "id": {
+                        "S": "RUN"
+                    }
+                },
+                "UpdateExpression": "SET runStatus = :s, lastRunTime = :r",
+                "ExpressionAttributeValues": {
+                    ":s": {
+                        "S": "COMPLETED"
+                    },
+                    ":r": {
+                        "S.$": "$.triggerTime"
+                    }
+                }
+            },
+            "Next": "Export Completed"
         },
-        "UpdateExpression": "SET runStatus = :s, lastRunTime = :r",
-        "ExpressionAttributeValues": {
-          ":s": {
-            "S": "COMPLETED"
-          },
-          ":r": {
-            "S.$": "$.triggerTime"
-          }
+        "Export Completed": {
+            "Type": "Succeed"
         }
-      },
-      "Next": "Export Completed"
     },
-    "Export Completed": {
-      "Type": "Succeed"
-    }
-  },
-  "TimeoutSeconds": 3600
+    "TimeoutSeconds": 3600
 }

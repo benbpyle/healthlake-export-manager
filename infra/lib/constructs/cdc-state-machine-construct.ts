@@ -188,6 +188,7 @@ export default class CdcStateMachineConstruct extends Construct {
             definitionSubstitutions: {
                 PrepareChangeFunction: props.prepChangeFunction.functionArn,
                 StartExportQueueUrl: props.startExportQueue.queueUrl,
+                EventBus: props.bus.eventBusName,
             },
         });
     }
