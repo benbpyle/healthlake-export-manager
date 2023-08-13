@@ -1,2 +1,3 @@
-# healthlake-export-manager
-Sample and working repos to demonstrate exporting data from AWS HealthLake to trigger downstream operations
+# HealthLake Export Manager
+
+Purpose: Working example of using AWS Step Functions, SQS, Lambda, S3 and EventBridge to manage scheduled exports of FHIR resources in AWS HealthLake.
